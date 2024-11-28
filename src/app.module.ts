@@ -1,24 +1,31 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
-import { AuthController } from './auth/auth.controller';
-import { AuthService } from './auth/auth.service';
-import { AuthModule } from './auth/auth.module';
+import { AuthController } from './modules/auth/auth.controller';
+import { AuthService } from './modules/auth/auth.service';
+import { AuthModule } from './modules/auth/auth.module';
 import { DatabaseModule } from './database/database.module';
-import { CrawlController } from './crawl/crawl.controller';
-import { CrawlService } from './crawl/crawl.service';
-import { CrawlModule } from './crawl/crawl.module';
-import { ApplyController } from './apply/apply.controller';
-import { ApplyModule } from './apply/apply.module';
+import { JobsController } from './modules/jobs/jobs.controller';
+import { JobsService } from './modules/jobs/jobs.service';
+import { JobsModule } from './modules/jobs/jobs.module';
+import { ApplyController } from './modules/apply/apply.controller';
+import { ApplyModule } from './modules/apply/apply.module';
+import { CommunityController } from './modules/community/community.controller';
+import { CommunityService } from './modules/community/community.service';
+import { CommunityModule } from './modules/community/community.module';
 
 @Module({
-  imports: [AuthModule, DatabaseModule, CrawlModule, ApplyModule],
-  controllers: [
-    AppController,
-    AuthController,
-    CrawlController,
-    ApplyController,
+  imports: [
+    AuthModule,
+    DatabaseModule,
+    JobsModule,
+    ApplyModule,
+    CommunityModule,
   ],
-  providers: [AppService, AuthService, CrawlService],
+  controllers: [
+    AuthController,
+    JobsController,
+    ApplyController,
+    CommunityController,
+  ],
+  providers: [AuthService, JobsService, CommunityService],
 })
 export class AppModule {}
