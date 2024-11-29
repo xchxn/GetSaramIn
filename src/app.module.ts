@@ -11,6 +11,7 @@ import { ApplyModule } from './modules/apply/apply.module';
 import { CommunityController } from './modules/community/community.controller';
 import { CommunityService } from './modules/community/community.service';
 import { CommunityModule } from './modules/community/community.module';
+import { CompanyModule } from './modules/company/company.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { CommunityModule } from './modules/community/community.module';
     JobsModule,
     ApplyModule,
     CommunityModule,
+    CompanyModule,
   ],
   controllers: [
     AuthController,
