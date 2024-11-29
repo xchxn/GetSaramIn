@@ -126,4 +126,8 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
   }
+
+  async updateProfile(req: any): Promise<any> {
+    return this.userRepository.update(req.id, req);
+  }
 }
