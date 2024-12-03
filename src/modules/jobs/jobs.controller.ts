@@ -5,7 +5,7 @@ import { JobsService } from './jobs.service';
 export class JobsController {
   constructor(private readonly jobsService: JobsService) {}
 
-  @Get()
+  @Get('get')
   async getJobs(): Promise<any> {
     return this.jobsService.getJobs();
   }

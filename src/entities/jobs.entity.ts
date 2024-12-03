@@ -6,20 +6,26 @@ export class JobsEntity {
   id: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
-  experience: string;
+  companyName: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
-  salary: string;
+  jobTitle: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  sectors: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   location: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
+  career: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
   education: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
-  workday: string;
+  deadline: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
-  workType: string;
+  postedDate: string;
 }
