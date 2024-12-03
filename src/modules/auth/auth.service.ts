@@ -130,4 +130,8 @@ export class AuthService {
   async updateProfile(req: any): Promise<any> {
     return this.userRepository.update(req.id, req);
   }
+
+  async quit(req: any): Promise<any> {
+    return this.userRepository.delete(req.id);
+  }
 }

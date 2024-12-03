@@ -34,4 +34,10 @@ export class AuthController {
   async updateProfile(@Body() req: any): Promise<any> {
     return this.authService.updateProfile(req);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('quit')
+  async quit(@Body() req: any): Promise<any> {
+    return this.authService.quit(req);
+  }
 }
