@@ -1,8 +1,9 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { JobsEntity } from 'src/entities/jobs.entity';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import * as puppeteer from 'puppeteer';
+import { GetJobsDto } from 'src/dto/get-jobs.dto';
 
 @Injectable()
 export class JobsService {
@@ -12,7 +13,7 @@ export class JobsService {
     private readonly configService: ConfigService,
   ) {}
 
-  async getJobs(): Promise<any> {
+  async crawlingJobs(): Promise<any> {
     const browser = await puppeteer.launch();
     const baseUrl = this.configService.get('DEFAULT_REQUEST_URL');
     const url = `${baseUrl}/job-category?cat_kewd=84&loc_mcd=101000%2C102000&panel_type=&search_optional_item=n&search_done=y&panel_count=y&preview=y&page=1&page_count=100`;
@@ -141,5 +142,83 @@ export class JobsService {
       throw new Error('Required fields are missing');
     }
     return true;
+  }
+
+  async getJobs(getJobsDto: GetJobsDto): Promise<any> {
+    const {
+      search,
+      keyword,
+      company,
+      category,
+      location,
+      experience,
+      page,
+      limit,
+    } = getJobsDto;
+
+    const queryBuilder = this.jobsRepository.createQueryBuilder('job');
+
+    // 통합 검색어 처리
+    if (search) {
+      queryBuilder.where(
+        '(job.title ILIKE :search OR job.description ILIKE :search OR job.company ILIKE :search)',
+        { search: `%${search}%` },
+      );
+    }
+
+    // 개별 필터 조건 추가
+    if (keyword) {
+      queryBuilder.andWhere('job.title ILIKE :keyword', {
+        keyword: `%${keyword}%`,
+      });
+    }
+
+    if (company) {
+      queryBuilder.andWhere('job.company ILIKE :company', {
+        company: `%${company}%`,
+      });
+    }
+
+    if (category) {
+      queryBuilder.andWhere('job.category = :category', { category });
+    }
+
+    if (location) {
+      queryBuilder.andWhere('job.location ILIKE :location', {
+        location: `%${location}%`,
+      });
+    }
+
+    if (experience) {
+      queryBuilder.andWhere('job.experience = :experience', { experience });
+    }
+
+    // 페이지네이션 처리
+    const skip = (page - 1) * limit;
+    queryBuilder.skip(skip).take(limit);
+
+    // 최신순 정렬
+    queryBuilder.orderBy('job.createdAt', 'DESC');
+
+    // 전체 갯수와 데이터 조회
+    const [jobs, total] = await queryBuilder.getManyAndCount();
+
+    return {
+      data: jobs,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getJobById(id: string): Promise<JobsEntity> {
+    const job = await this.jobsRepository.findOne({ where: { id } });
+    if (!job) {
+      throw new NotFoundException(`Job with ID ${id} not found`);
+    }
+    return job;
   }
 }
