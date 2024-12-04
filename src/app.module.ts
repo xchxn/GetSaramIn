@@ -7,6 +7,7 @@ import { ApplyModule } from './modules/apply/apply.module';
 import { CommunityModule } from './modules/community/community.module';
 import { CompanyModule } from './modules/company/company.module';
 import { HttpModule } from '@nestjs/axios';
+import { BookmarksModule } from './modules/bookmarks/bookmarks.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { HttpModule } from '@nestjs/axios';
     CommunityModule,
     CompanyModule,
     HttpModule,
+    BookmarksModule,
   ],
   controllers: [],
   providers: [],

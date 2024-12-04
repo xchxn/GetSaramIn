@@ -219,6 +219,11 @@ export class JobsService {
     if (!job) {
       throw new NotFoundException(`Job with ID ${id} not found`);
     }
+    
+    // Increment view count
+    job.viewCount = (job.viewCount || 0) + 1;
+    await this.jobsRepository.save(job);
+    
     return job;
   }
 }

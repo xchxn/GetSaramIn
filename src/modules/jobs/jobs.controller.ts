@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, Param } from '@nestjs/common';
 import { JobsService } from './jobs.service';
 import { GetJobsDto } from 'src/dto/get-jobs.dto';
 
@@ -14,5 +14,10 @@ export class JobsController {
   @Get('jobs')
   async getJobs(@Query() getJobsDto: GetJobsDto): Promise<any> {
     return this.jobsService.getJobs(getJobsDto);
+  }
+
+  @Get('jobs/:id')
+  async getJobById(@Param('id') id: string): Promise<any> {
+    return this.jobsService.getJobById(id);
   }
 }

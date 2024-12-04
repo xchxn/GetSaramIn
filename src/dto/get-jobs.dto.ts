@@ -7,4 +7,5 @@ export class GetJobsDto {
   readonly experience?: string;
   readonly page?: number;
   readonly limit?: number;
+  readonly viewCount?: number;
 }
