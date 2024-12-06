@@ -1,23 +1,40 @@
-import { Controller, Get, Query, Param } from '@nestjs/common';
+import { Controller, Get, Param, Query, HttpException, HttpStatus } from '@nestjs/common';
 import { JobsService } from './jobs.service';
 import { GetJobsDto } from 'src/dto/get-jobs.dto';
+import { ApiResponseDto } from 'src/dto/api-response.dto';
+import { JobsEntity } from 'src/entities/jobs.entity';
 
 @Controller('jobs')
 export class JobsController {
   constructor(private readonly jobsService: JobsService) {}
 
-  @Get('crawling')
-  async crawlingJobs(): Promise<any> {
-    return this.jobsService.crawlingJobs();
+  @Get('crawl')
+  async crawlJobs(): Promise<ApiResponseDto<JobsEntity[]>> {
+    const response = await this.jobsService.crawlingJobs();
+    if (!response.success) {
+      throw new HttpException(response.error, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+    return response;
   }
 
-  @Get('jobs')
-  async getJobs(@Query() getJobsDto: GetJobsDto): Promise<any> {
-    return this.jobsService.getJobs(getJobsDto);
+  @Get()
+  async getJobs(@Query() getJobsDto: GetJobsDto): Promise<ApiResponseDto<{ data: JobsEntity[]; meta: any }>> {
+    const response = await this.jobsService.getJobs(getJobsDto);
+    if (!response.success) {
+      throw new HttpException(response.error, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+    return response;
   }
 
-  @Get('jobs/:id')
-  async getJobById(@Param('id') id: string): Promise<any> {
-    return this.jobsService.getJobById(id);
+  @Get(':id')
+  async getJobById(@Param('id') id: string): Promise<ApiResponseDto<JobsEntity>> {
+    const response = await this.jobsService.getJobById(id);
+    if (!response.success) {
+      throw new HttpException(
+        response.error,
+        response.error.code === 'JOB_NOT_FOUND' ? HttpStatus.NOT_FOUND : HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+    return response;
   }
 }

@@ -14,8 +14,8 @@ import { BookmarksModule } from './modules/bookmarks/bookmarks.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    DatabaseModule, 
     AuthModule,
-    DatabaseModule,
     JobsModule,
     ApplyModule,
     CommunityModule,

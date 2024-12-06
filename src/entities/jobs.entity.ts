@@ -29,6 +29,6 @@ export class JobsEntity {
   @Column({ type: 'varchar', length: 255, nullable: true })
   postedDate: string;
 
-  @Column({ type: 'number', default: 0 })
+  @Column({ type: 'int', default: 0 })
   viewCount: number;
 }

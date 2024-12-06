@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import * as puppeteer from 'puppeteer';
 import { GetJobsDto } from 'src/dto/get-jobs.dto';
+import { ApiResponseDto, ErrorCodes } from 'src/dto/api-response.dto';
 
 @Injectable()
 export class JobsService {
@@ -13,86 +14,156 @@ export class JobsService {
     private readonly configService: ConfigService,
   ) {}
 
+  // 크롤링
   async crawlingJobs(): Promise<any> {
-    const browser = await puppeteer.launch();
+    const puppeteer = require('puppeteer');
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
     const baseUrl = this.configService.get('DEFAULT_REQUEST_URL');
-    const url = `${baseUrl}/job-category?cat_kewd=84&loc_mcd=101000%2C102000&panel_type=&search_optional_item=n&search_done=y&panel_count=y&preview=y&page=1&page_count=100`;
+
+    const page = await browser.newPage();
+    
+    // page config
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    await page.setViewport({ width: 1920, height: 1080 });
+    await page.setDefaultNavigationTimeout(120000);
+
+    const collectedJobs: JobsEntity[] = [];
+    let retryCount = 0;
+    const maxRetries = 3;
 
     try {
-      const page = await browser.newPage();
+      for (let i = 1; i <= 1; i++) {
+        const url = `${baseUrl}/job-category?page=2&cat_kewd=84&isAjaxRequest=0&page_count=50&sort=RL&type=job-category&is_param=1&isSearchResultEmpty=1&isSectionHome=0&searchParamCount=1#searchTitle`;
+        
+        let pageLoaded = false;
+        while (!pageLoaded && retryCount < maxRetries) {
+          try {
+            // First try to navigate to the page
+            await page.goto(url, { 
+              waitUntil: 'domcontentloaded',  // Changed to only wait for DOM
+              timeout: 120000 
+            });
 
-      // 브라우저 설정 추가
-      await page.setDefaultNavigationTimeout(120000); // 타임아웃 30초로 설정
-      await page.setRequestInterception(true);
+            // Then wait for the content to be actually loaded
+            try {
+              // 페이지가 실제로 사람인 페이지인지 확인
+              const isValidPage = await page.evaluate(() => {
+                return window.location.href.includes('saramin.co.kr');
+              });
 
-      await page.setUserAgent(
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-      );
+              if (!isValidPage) {
+                console.warn('Not a valid Saramin page, might be redirected');
+                throw new Error('Invalid page');
+              }
 
-      // 불필요한 리소스 차단
-      page.on('request', (request) => {
-        if (
-          ['image', 'stylesheet', 'font', 'media'].includes(
-            request.resourceType(),
-          )
-        ) {
-          request.abort();
-        } else {
-          request.continue();
+              // 먼저 company_nm이 있는지 확인 (이는 항상 먼저 로드되는 요소)
+              await page.waitForSelector('.company_nm', { timeout: 20000 });
+              
+              // 그 다음 실제 리스트 아이템을 확인
+              await page.waitForSelector('.list_item', { 
+                timeout: 10000,
+                visible: true 
+              });
+
+              // 최소 1개 이상의 항목이 있는지 확인
+              const hasItems = await page.evaluate(() => {
+                return document.querySelectorAll('.list_item').length > 0;
+              });
+
+              if (!hasItems) {
+                console.warn('Page loaded but no job listings found');
+                throw new Error('No listings');
+              }
+
+              pageLoaded = true;
+            } catch (selectorError) {
+              console.warn(`Job listings not found, retrying... (${retryCount + 1}/${maxRetries})`);
+              console.warn(`Error details: ${selectorError.message}`);
+              retryCount++;
+              if (retryCount >= maxRetries) throw selectorError;
+              continue;
+            }
+          } catch (error) {
+            console.error(`Failed to load page ${i}, attempt ${retryCount + 1}:`, error);
+            retryCount++;
+            if (retryCount >= maxRetries) throw error;
+          }
         }
-      });
 
-      await page.goto(url, {
-        waitUntil: ['domcontentloaded', 'networkidle2'], // 변경된 waitUntil 옵션
-        timeout: 120000,
-      });
+        const jobs = await page.evaluate(() => {
+          return Array.from(document.querySelectorAll('.list_item')).map((element) => {
+            // Helper function to safely extract text content
+            const getText = (selector: string): string => {
+              const el = element.querySelector(selector);
+              return el ? el.textContent?.trim() || '' : '';
+            };
 
-      // 4. 특정 요소가 로드될 때까지 대기
-      await page.waitForSelector('.list_item', {
-        timeout: 120000,
-      });
+            // Extract job link
+            const jobLink = element.querySelector('.job_tit a');
+            const jobUrl = jobLink ? (jobLink as HTMLAnchorElement).href : '';
 
-      const jobs = await page.evaluate(() => {
-        const jobItems = document.querySelectorAll('.list_item');
-        return Array.from(jobItems).map((item) => {
-          const recNumber = item.id.replace('rec-', ''); // id 값 추출
-          return {
-            id: recNumber, // PrimaryKey로 사용할 id
-            companyName: item
-              .querySelector('.company_nm .str_tit')
-              ?.textContent?.trim(),
-            jobTitle: item
-              .querySelector('.job_tit .str_tit span')
-              ?.textContent?.trim(),
-            sectors: Array.from(item.querySelectorAll('.job_sector span'))
-              .map((span) => span.textContent?.trim())
-              .filter((text) => text)
-              .join(', '), // 배열을 문자열로 변환
-            location: item.querySelector('.work_place')?.textContent?.trim(),
-            career: item.querySelector('.career')?.textContent?.trim(),
-            education: item.querySelector('.education')?.textContent?.trim(),
-            deadline: item
-              .querySelector('.support_detail .date')
-              ?.textContent?.trim(),
-            postedDate: item
-              .querySelector('.support_detail .deadlines')
-              ?.textContent?.trim(),
-          };
+            // Extract company link
+            const companyLink = element.querySelector('.company_nm a');
+            const companyUrl = companyLink ? (companyLink as HTMLAnchorElement).href : '';
+
+            // Extract sectors (job categories)
+            const sectors = Array.from(element.querySelectorAll('.job_sector span'))
+              .map(span => span.textContent?.trim() || '')
+              .filter(Boolean)
+              .join(', ');
+
+            // Extract deadline and posted date
+            const deadlineInfo = element.querySelector('.support_detail .date');
+            const postedInfo = element.querySelector('.support_detail .deadlines');
+
+            // Extract job ID from the list item's id attribute
+            const jobId = element.id.replace('rec-', '');
+
+            return {
+              jobId,
+              companyName: getText('.company_nm a'),
+              jobTitle: getText('.job_tit a'),
+              sectors,
+              location: getText('.work_place'),
+              career: getText('.career'),
+              education: getText('.education'),
+              deadline: deadlineInfo ? deadlineInfo.textContent?.trim().replace('~', '') : '',
+              postedDate: postedInfo ? postedInfo.textContent?.trim() : '',
+              jobUrl,
+              companyUrl,
+              workType: getText('.career')?.split('·')[1]?.trim() || '',
+              updatedAt: new Date().toISOString(),
+            };
+          });
         });
-      });
 
-      await this.saveOptimized(jobs);
+        const validJobs = jobs.filter(job => job.jobTitle && job.companyName);
+        collectedJobs.push(...validJobs.map((job: any) => this.jobsRepository.create(job)));
+      }
 
-      await page.close();
-      console.log(jobs);
-      return jobs;
+      console.log('Crawling completed successfully.');
+
+      if (collectedJobs.length > 0) {
+        console.log(`Saving ${collectedJobs.length} jobs to database...`);
+        await this.jobsRepository.save(collectedJobs);
+        console.log('Jobs saved successfully');
+      } else {
+        console.warn('No jobs were collected during the crawling process');
+      }
+
+      return `Successfully crawled and saved ${collectedJobs.length} jobs`;
     } catch (error) {
-      console.error('Error scraping jobs:', error);
-      throw error;
+      console.error('Crawling error:', error);
+      throw new Error(`Crawling failed: ${error.message}`);
+    } finally {
+      if (page) await page.close();
+      if (browser) await browser.close();
     }
   }
-
-  // 최적화된 저장 함수
+  // 크롤링 요청 배치+병렬 전략으로 최적화
   private async saveOptimized(jobs: any[]) {
     const batchSize = 100;
     const concurrentBatches = 3;
@@ -137,93 +208,119 @@ export class JobsService {
     }
   }
 
-  private validateJobData(job: any) {
-    if (!job.id || !job.companyName || !job.jobTitle) {
-      throw new Error('Required fields are missing');
-    }
-    return true;
+  private validateJobData(job: any): boolean {
+    return !!(job.id && job.companyName && job.jobTitle);
   }
 
-  async getJobs(getJobsDto: GetJobsDto): Promise<any> {
-    const {
-      search,
-      keyword,
-      company,
-      category,
-      location,
-      experience,
-      page,
-      limit,
-    } = getJobsDto;
+  // 채용 조회
+  async getJobs(getJobsDto: GetJobsDto): Promise<ApiResponseDto<{ data: JobsEntity[]; meta: any }>> {
+    try {
+      const {
+        search,
+        keyword,
+        company,
+        category,
+        location,
+        experience,
+        page = 1,
+        limit = 10,
+      } = getJobsDto;
 
-    const queryBuilder = this.jobsRepository.createQueryBuilder('job');
+      const queryBuilder = this.jobsRepository.createQueryBuilder('job');
 
-    // 통합 검색어 처리
-    if (search) {
-      queryBuilder.where(
-        '(job.title ILIKE :search OR job.description ILIKE :search OR job.company ILIKE :search)',
-        { search: `%${search}%` },
-      );
+      if (search) {
+        queryBuilder.where(
+          '(job.title ILIKE :search OR job.description ILIKE :search OR job.company ILIKE :search)',
+          { search: `%${search}%` },
+        );
+      }
+
+      if (keyword) {
+        queryBuilder.andWhere('job.title ILIKE :keyword', {
+          keyword: `%${keyword}%`,
+        });
+      }
+
+      if (company) {
+        queryBuilder.andWhere('job.company ILIKE :company', {
+          company: `%${company}%`,
+        });
+      }
+
+      if (category) {
+        queryBuilder.andWhere('job.category = :category', { category });
+      }
+
+      if (location) {
+        queryBuilder.andWhere('job.location ILIKE :location', {
+          location: `%${location}%`,
+        });
+      }
+
+      if (experience) {
+        queryBuilder.andWhere('job.experience = :experience', { experience });
+      }
+
+      const skip = (page - 1) * limit;
+      queryBuilder.skip(skip).take(limit);
+      queryBuilder.orderBy('job.createdAt', 'DESC');
+
+      const [jobs, total] = await queryBuilder.getManyAndCount();
+
+      return {
+        success: true,
+        data: {
+          data: jobs,
+          meta: {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+          },
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          code: ErrorCodes.INTERNAL_ERROR,
+          message: 'Failed to fetch jobs'
+        }
+      };
     }
-
-    // 개별 필터 조건 추가
-    if (keyword) {
-      queryBuilder.andWhere('job.title ILIKE :keyword', {
-        keyword: `%${keyword}%`,
-      });
-    }
-
-    if (company) {
-      queryBuilder.andWhere('job.company ILIKE :company', {
-        company: `%${company}%`,
-      });
-    }
-
-    if (category) {
-      queryBuilder.andWhere('job.category = :category', { category });
-    }
-
-    if (location) {
-      queryBuilder.andWhere('job.location ILIKE :location', {
-        location: `%${location}%`,
-      });
-    }
-
-    if (experience) {
-      queryBuilder.andWhere('job.experience = :experience', { experience });
-    }
-
-    // 페이지네이션 처리
-    const skip = (page - 1) * limit;
-    queryBuilder.skip(skip).take(limit);
-
-    // 최신순 정렬
-    queryBuilder.orderBy('job.createdAt', 'DESC');
-
-    // 전체 갯수와 데이터 조회
-    const [jobs, total] = await queryBuilder.getManyAndCount();
-
-    return {
-      data: jobs,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
   }
-
-  async getJobById(id: string): Promise<JobsEntity> {
-    const job = await this.jobsRepository.findOne({ where: { id } });
-    if (!job) {
-      throw new NotFoundException(`Job with ID ${id} not found`);
+  
+  // 특정 채용 공고 조회
+  async getJobById(id: string): Promise<ApiResponseDto<JobsEntity>> {
+    try {
+      const job = await this.jobsRepository.findOne({ where: { id } });
+      
+      if (!job) {
+        return {
+          success: false,
+          error: {
+            code: ErrorCodes.JOB_NOT_FOUND,
+            message: `Job with ID ${id} not found`
+          }
+        };
+      }
+      
+      // Increment view count
+      job.viewCount = (job.viewCount || 0) + 1;
+      await this.jobsRepository.save(job);
+      
+      return {
+        success: true,
+        data: job
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          code: ErrorCodes.INTERNAL_ERROR,
+          message: 'Failed to fetch job details'
+        }
+      };
     }
-    
-    // Increment view count
-    job.viewCount = (job.viewCount || 0) + 1;
-    await this.jobsRepository.save(job);
-    
-    return job;
   }
 }

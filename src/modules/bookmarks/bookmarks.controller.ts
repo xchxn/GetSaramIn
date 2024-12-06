@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { BookmarksService } from './bookmarks.service';
 import { JwtAuthGuard } from '../auth/strategies/jwt-auth.guard';
 
@@ -10,12 +10,12 @@ export class BookmarksController {
 
     @UseGuards(JwtAuthGuard)
     @Post()
-    async create(@Body() req: any): Promise<any> {
-        return await this.bookmarksService.create(req);
+    async setBookmark(@Body() req: any): Promise<any> {
+        return await this.bookmarksService.setBookmark(req, req.user.id);
     }
 
     @Get()
-    async getList(): Promise<any> {
-        return await this.bookmarksService.getList();
+    async getList(@Query() req: any): Promise<any> {
+        return await this.bookmarksService.getList(req);
     }
 }

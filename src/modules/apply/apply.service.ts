@@ -7,7 +7,7 @@ import { ApiResponseDto, ErrorCodes } from 'src/dto/api-response.dto';
 @Injectable()
 export class ApplyService {
     constructor(
-        @Inject('APPLY_REPOSITORY')
+        @Inject('APPLICATION_REPOSITORY')
         private readonly applyRepository: Repository<ApplicationsEntity>,
     ) {}
 
