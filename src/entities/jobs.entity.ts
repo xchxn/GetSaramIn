@@ -6,7 +6,13 @@ export class JobsEntity {
   id: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
+  title: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
   companyName: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  companyUrl: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   jobTitle: string;

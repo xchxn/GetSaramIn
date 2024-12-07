@@ -9,13 +9,7 @@ export class EventsEntity {
     title: string;
 
     @Column({ type: 'varchar', length: 255, nullable: true })
-    start: string;
-
-    @Column({ type: 'varchar', length: 255, nullable: true })
-    end: string;
-
-    @Column({ type: 'varchar', length: 255, nullable: true })
-    description: string;
+    date: string;
 
     @Column({ type: 'varchar', length: 255, nullable: true })
     target: string;

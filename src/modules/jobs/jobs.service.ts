@@ -6,6 +6,7 @@ import * as puppeteer from 'puppeteer';
 import * as cheerio from 'cheerio';
 import { GetJobsDto } from 'src/dto/get-jobs.dto';
 import { ApiResponseDto, ErrorCodes } from 'src/dto/api-response.dto';
+import { timeout } from 'rxjs';
 
 @Injectable()
 export class JobsService {
@@ -17,6 +18,8 @@ export class JobsService {
 
   // 크롤링
   async crawlingJobs(): Promise<any> {
+    const fs = require('fs');
+
     const browser = await puppeteer.launch({
       headless: true,
     });
@@ -30,40 +33,62 @@ export class JobsService {
     const collectedJobs: JobsEntity[] = [];
 
     try {
-      for (let i = 49541178; i <= 49541178; i++) {
+      for (let i = 49488761; i <= 49488860; i++) {
         const url = `${baseUrl}/zf_user/jobs/relay/view?view_type=list&rec_idx=${i}`;
 
         await page.goto(url);
+        // 페이지가 완전히 로드될 때까지 기다림
+        await page.waitForSelector('#content', { timeout: 120000 });
         const content = await page.content();
+        
         const $ = cheerio.load(content);
 
         const getTextContent = (selector: string) => {
-          return $(selector).text().trim() || '';
+          return $(selector).text().trim();
+        };
+
+        const getHrefContent = (selector: string) => {
+          return $(selector).attr('href');
         };
 
         const id = `${i}`;
-        const companyName = getTextContent(`#content > div.jview_floating.jview > div > div.jv_header_float > div > div.title_inner > a.company`);
-
-        const experience = getTextContent(`#content > div.wrap_jview > section.jview.jview-0-${i} > div.wrap_jv_cont > div.jv_cont.jv_summary > div > div:nth-child(1) > dl:nth-child(1) > dd > strong`);
-        const education = getTextContent(`#content > div.wrap_jview > section.jview.jview-0-${i} > div.wrap_jv_cont > div.jv_cont.jv_summary > div > div:nth-child(1) > dl:nth-child(2) > dd > strong`);
-        const employmentType = getTextContent(`#content > div.wrap_jview > section.jview.jview-0-${i} > div.wrap_jv_cont > div.jv_cont.jv_summary > div > div:nth-child(1) > dl:nth-child(3) > dd > strong`);
-        const salary = getTextContent(`#content > div.wrap_jview > section.jview.jview-0-${i} > div.wrap_jv_cont > div.jv_cont.jv_summary > div > div:nth-child(2) > dl:nth-child(1) > dd`);
-        const location = getTextContent(`#content > div.wrap_jview > section.jview.jview-0-${i} > div.wrap_jv_cont > div.jv_cont.jv_summary > div > div:nth-child(2) > dl:nth-child(2) > dd`);
+        
+        const companyName = getTextContent(`.wrap_jview > section.jview.jview-0-${i} > div.wrap_jv_cont > div.wrap_jv_header > div > div.title_inner > a.company`);
+        const companyUrl = getHrefContent(`.wrap_jview > section.jview.jview-0-${i} > div.wrap_jv_cont > div.wrap_jv_header > div > div.title_inner > a.company`);
+        const title = getTextContent(`.wrap_jview > section.jview.jview-0-${i} > div.wrap_jv_cont > div.wrap_jv_header > div > h1`);
+        const experience = getTextContent(`.wrap_jview > section.jview.jview-0-${i} > div.wrap_jv_cont > div.jv_cont.jv_summary > div > div:nth-child(1) > dl:nth-child(1) > dd > strong`);
+        const education = getTextContent(`.wrap_jview > section.jview.jview-0-${i} > div.wrap_jv_cont > div.jv_cont.jv_summary > div > div:nth-child(1) > dl:nth-child(2) > dd > strong`);
+        const employmentType = getTextContent(`.wrap_jview > section.jview.jview-0-${i} > div.wrap_jv_cont > div.jv_cont.jv_summary > div > div:nth-child(1) > dl:nth-child(3) > dd > strong`);
+        const salary = getTextContent(`.wrap_jview > section.jview.jview-0-${i} > div.wrap_jv_cont > div.jv_cont.jv_summary > div > div:nth-child(2) > dl:nth-child(1) > dd`);
+        const location = getTextContent(`.wrap_jview > section.jview.jview-0-${i} > div.wrap_jv_cont > div.jv_cont.jv_summary > div > div:nth-child(2) > dl:nth-child(2) > dd`);
         
         const metaDescription = $('head > meta:nth-child(7)').attr('content') || '';
         
-        console.log(`Experience: ${experience}, Education: ${education}, Employment Type: ${employmentType}, Salary: ${salary}, Location: ${location}, Company Name: ${companyName}, Meta Description: ${metaDescription}`);
+        console.log({
+          id,
+          companyName,
+          companyUrl,
+          title,
+          experience,
+          education,
+          employmentType,
+          salary,
+          location,
+          metaDescription
+        });
 
         if ([experience, education, employmentType, salary, location, companyName].some(value => value)) {
           const jobEntity = new JobsEntity();
           Object.assign(jobEntity, {
             id,
+            title,
             experience,
             education,
             employmentType,
             salary,
             location,
             companyName,
+            companyUrl,
             metaDescription
           });
           collectedJobs.push(jobEntity);
@@ -124,10 +149,6 @@ export class JobsService {
       // 다음 배치 그룹 처리 전 잠시 대기
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
-  }
-
-  private validateJobData(job: any): boolean {
-    return !!(job.id && job.companyName && job.jobTitle);
   }
 
   // 채용 조회

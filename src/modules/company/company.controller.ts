@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { CompanyService } from './company.service';
 
 @Controller('company')
@@ -8,7 +8,7 @@ export class CompanyController {
     ) {}
 
     @Get()
-    getCompany() {
-        return this.companyService.getCompany();
+    getCompanyInformation(@Query() req: any): Promise<any> {
+        return this.companyService.getCompany(req);
     }
 }
