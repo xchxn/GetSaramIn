@@ -18,7 +18,7 @@ export class JobsEntity {
   location: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
-  career: string;
+  experience: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   education: string;
@@ -28,6 +28,15 @@ export class JobsEntity {
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   postedDate: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  metaDescription: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  employmentType: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  salary: string;
 
   @Column({ type: 'int', default: 0 })
   viewCount: number;

@@ -3,6 +3,7 @@ import { JobsEntity } from 'src/entities/jobs.entity';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import * as puppeteer from 'puppeteer';
+import * as cheerio from 'cheerio';
 import { GetJobsDto } from 'src/dto/get-jobs.dto';
 import { ApiResponseDto, ErrorCodes } from 'src/dto/api-response.dto';
 
@@ -12,147 +13,64 @@ export class JobsService {
     @Inject('JOBS_REPOSITORY')
     private readonly jobsRepository: Repository<JobsEntity>,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   // 크롤링
   async crawlingJobs(): Promise<any> {
-    const puppeteer = require('puppeteer');
     const browser = await puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
     const baseUrl = this.configService.get('DEFAULT_REQUEST_URL');
 
     const page = await browser.newPage();
-    
+
     // page config
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-    await page.setViewport({ width: 1920, height: 1080 });
-    await page.setDefaultNavigationTimeout(120000);
 
     const collectedJobs: JobsEntity[] = [];
-    let retryCount = 0;
-    const maxRetries = 3;
 
     try {
-      for (let i = 1; i <= 1; i++) {
-        const url = `${baseUrl}/job-category?page=2&cat_kewd=84&isAjaxRequest=0&page_count=50&sort=RL&type=job-category&is_param=1&isSearchResultEmpty=1&isSectionHome=0&searchParamCount=1#searchTitle`;
+      for (let i = 49541178; i <= 49541178; i++) {
+        const url = `${baseUrl}/zf_user/jobs/relay/view?view_type=list&rec_idx=${i}`;
+
+        await page.goto(url);
+        const content = await page.content();
+        const $ = cheerio.load(content);
+
+        const getTextContent = (selector: string) => {
+          return $(selector).text().trim() || '';
+        };
+
+        const id = `${i}`;
+        const companyName = getTextContent(`#content > div.jview_floating.jview > div > div.jv_header_float > div > div.title_inner > a.company`);
+
+        const experience = getTextContent(`#content > div.wrap_jview > section.jview.jview-0-${i} > div.wrap_jv_cont > div.jv_cont.jv_summary > div > div:nth-child(1) > dl:nth-child(1) > dd > strong`);
+        const education = getTextContent(`#content > div.wrap_jview > section.jview.jview-0-${i} > div.wrap_jv_cont > div.jv_cont.jv_summary > div > div:nth-child(1) > dl:nth-child(2) > dd > strong`);
+        const employmentType = getTextContent(`#content > div.wrap_jview > section.jview.jview-0-${i} > div.wrap_jv_cont > div.jv_cont.jv_summary > div > div:nth-child(1) > dl:nth-child(3) > dd > strong`);
+        const salary = getTextContent(`#content > div.wrap_jview > section.jview.jview-0-${i} > div.wrap_jv_cont > div.jv_cont.jv_summary > div > div:nth-child(2) > dl:nth-child(1) > dd`);
+        const location = getTextContent(`#content > div.wrap_jview > section.jview.jview-0-${i} > div.wrap_jv_cont > div.jv_cont.jv_summary > div > div:nth-child(2) > dl:nth-child(2) > dd`);
         
-        let pageLoaded = false;
-        while (!pageLoaded && retryCount < maxRetries) {
-          try {
-            // First try to navigate to the page
-            await page.goto(url, { 
-              waitUntil: 'domcontentloaded',  // Changed to only wait for DOM
-              timeout: 120000 
-            });
+        const metaDescription = $('head > meta:nth-child(7)').attr('content') || '';
+        
+        console.log(`Experience: ${experience}, Education: ${education}, Employment Type: ${employmentType}, Salary: ${salary}, Location: ${location}, Company Name: ${companyName}, Meta Description: ${metaDescription}`);
 
-            // Then wait for the content to be actually loaded
-            try {
-              // 페이지가 실제로 사람인 페이지인지 확인
-              const isValidPage = await page.evaluate(() => {
-                return window.location.href.includes('saramin.co.kr');
-              });
-
-              if (!isValidPage) {
-                console.warn('Not a valid Saramin page, might be redirected');
-                throw new Error('Invalid page');
-              }
-
-              // 먼저 company_nm이 있는지 확인 (이는 항상 먼저 로드되는 요소)
-              await page.waitForSelector('.company_nm', { timeout: 20000 });
-              
-              // 그 다음 실제 리스트 아이템을 확인
-              await page.waitForSelector('.list_item', { 
-                timeout: 10000,
-                visible: true 
-              });
-
-              // 최소 1개 이상의 항목이 있는지 확인
-              const hasItems = await page.evaluate(() => {
-                return document.querySelectorAll('.list_item').length > 0;
-              });
-
-              if (!hasItems) {
-                console.warn('Page loaded but no job listings found');
-                throw new Error('No listings');
-              }
-
-              pageLoaded = true;
-            } catch (selectorError) {
-              console.warn(`Job listings not found, retrying... (${retryCount + 1}/${maxRetries})`);
-              console.warn(`Error details: ${selectorError.message}`);
-              retryCount++;
-              if (retryCount >= maxRetries) throw selectorError;
-              continue;
-            }
-          } catch (error) {
-            console.error(`Failed to load page ${i}, attempt ${retryCount + 1}:`, error);
-            retryCount++;
-            if (retryCount >= maxRetries) throw error;
-          }
-        }
-
-        const jobs = await page.evaluate(() => {
-          return Array.from(document.querySelectorAll('.list_item')).map((element) => {
-            // Helper function to safely extract text content
-            const getText = (selector: string): string => {
-              const el = element.querySelector(selector);
-              return el ? el.textContent?.trim() || '' : '';
-            };
-
-            // Extract job link
-            const jobLink = element.querySelector('.job_tit a');
-            const jobUrl = jobLink ? (jobLink as HTMLAnchorElement).href : '';
-
-            // Extract company link
-            const companyLink = element.querySelector('.company_nm a');
-            const companyUrl = companyLink ? (companyLink as HTMLAnchorElement).href : '';
-
-            // Extract sectors (job categories)
-            const sectors = Array.from(element.querySelectorAll('.job_sector span'))
-              .map(span => span.textContent?.trim() || '')
-              .filter(Boolean)
-              .join(', ');
-
-            // Extract deadline and posted date
-            const deadlineInfo = element.querySelector('.support_detail .date');
-            const postedInfo = element.querySelector('.support_detail .deadlines');
-
-            // Extract job ID from the list item's id attribute
-            const jobId = element.id.replace('rec-', '');
-
-            return {
-              jobId,
-              companyName: getText('.company_nm a'),
-              jobTitle: getText('.job_tit a'),
-              sectors,
-              location: getText('.work_place'),
-              career: getText('.career'),
-              education: getText('.education'),
-              deadline: deadlineInfo ? deadlineInfo.textContent?.trim().replace('~', '') : '',
-              postedDate: postedInfo ? postedInfo.textContent?.trim() : '',
-              jobUrl,
-              companyUrl,
-              workType: getText('.career')?.split('·')[1]?.trim() || '',
-              updatedAt: new Date().toISOString(),
-            };
+        if ([experience, education, employmentType, salary, location, companyName].some(value => value)) {
+          const jobEntity = new JobsEntity();
+          Object.assign(jobEntity, {
+            id,
+            experience,
+            education,
+            employmentType,
+            salary,
+            location,
+            companyName,
+            metaDescription
           });
-        });
-
-        const validJobs = jobs.filter(job => job.jobTitle && job.companyName);
-        collectedJobs.push(...validJobs.map((job: any) => this.jobsRepository.create(job)));
+          collectedJobs.push(jobEntity);
+        }
       }
 
-      console.log('Crawling completed successfully.');
-
-      if (collectedJobs.length > 0) {
-        console.log(`Saving ${collectedJobs.length} jobs to database...`);
-        await this.jobsRepository.save(collectedJobs);
-        console.log('Jobs saved successfully');
-      } else {
-        console.warn('No jobs were collected during the crawling process');
-      }
+      await this.saveOptimized(collectedJobs);
 
       return `Successfully crawled and saved ${collectedJobs.length} jobs`;
     } catch (error) {
@@ -289,12 +207,12 @@ export class JobsService {
       };
     }
   }
-  
+
   // 특정 채용 공고 조회
   async getJobById(id: string): Promise<ApiResponseDto<JobsEntity>> {
     try {
       const job = await this.jobsRepository.findOne({ where: { id } });
-      
+
       if (!job) {
         return {
           success: false,
@@ -304,11 +222,11 @@ export class JobsService {
           }
         };
       }
-      
+
       // Increment view count
       job.viewCount = (job.viewCount || 0) + 1;
       await this.jobsRepository.save(job);
-      
+
       return {
         success: true,
         data: job
