@@ -245,7 +245,7 @@ export class JobsService {
       }
 
       // Increment view count
-      job.viewCount = (job.viewCount || 0) + 1;
+      job.viewCount = job.viewCount + 1;
       await this.jobsRepository.save(job);
 
       return {

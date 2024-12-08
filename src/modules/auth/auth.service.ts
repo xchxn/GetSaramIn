@@ -9,6 +9,10 @@ import { UserEntity } from 'src/entities/user.entity';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { QuitDto } from './dto/quit.dto';
 
 @Injectable()
 export class AuthService {
@@ -20,37 +24,38 @@ export class AuthService {
     private configServcie: ConfigService,
   ) {}
 
-  async register(req: any): Promise<any> {
+  async register(registerDto: RegisterDto): Promise<any> {
     const existingUser = await this.userRepository.findOne({
-      where: { id: req.id },
+      where: { id: registerDto.id },
     });
 
     if (existingUser) {
       throw new BadRequestException('ID already in use.');
     }
 
-    const hashedPassword = await bcrypt.hash(req.password, this.saltOrRounds);
+    const hashedPassword = await bcrypt.hash(registerDto.password, this.saltOrRounds);
 
     const newUser = await this.userRepository.save({
-      id: req.id,
-      username: req.username,
+      id: registerDto.id,
+      username: registerDto.username,
       password: hashedPassword,
     });
 
-    // 회원가입 즉시 토큰 발급
+    // Generate tokens immediately after registration
     const payload = { sub: newUser.id, username: newUser.username };
     const accessToken = await this.jwtService.signAsync(payload);
     const refreshToken = await this.jwtService.signAsync(payload, {
       expiresIn: '7d',
     });
 
-    // 리프레시 토큰 저장
+    // Save refresh token
     await this.userRepository.update(
       { id: newUser.id },
       { refreshToken: refreshToken },
     );
 
     return {
+      message: 'Registration successful',
       accessToken,
       refreshToken,
       userId: newUser.id,
@@ -58,80 +63,112 @@ export class AuthService {
     };
   }
 
-  async login(req: any): Promise<any> {
-    const login = await this.userRepository
-      .createQueryBuilder()
-      .select()
-      .where('id = :id', { id: req.id })
-      .getOne();
-    if (login === null) {
-      throw new Error('There is no login information, register first please');
+  async login(loginDto: LoginDto): Promise<any> {
+    const user = await this.userRepository.findOne({
+      where: { id: loginDto.id },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
     }
-    const check = await bcrypt.compare(req.password, login.password);
-    if (check) {
-      // JWT 인증 토큰 발급 추가
-      const payload = { sub: login.id, username: login.username };
 
-      login.accessToken = await this.jwtService.signAsync(payload);
-      login.refreshToken = await this.jwtService.signAsync(payload, {
-        expiresIn: '7d',
-      });
+    const isPasswordValid = await bcrypt.compare(loginDto.password, user.password);
 
-      await this.userRepository.save(login);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid password');
+    }
 
-      return {
-        accessToken: login.accessToken,
-        refreshToken: login.refreshToken,
-        userId: login.id,
-        username: login.username,
-      };
-    } else throw new UnauthorizedException();
+    const payload = { sub: user.id, username: user.username };
+    const accessToken = await this.jwtService.signAsync(payload);
+    const refreshToken = await this.jwtService.signAsync(payload, {
+      expiresIn: '7d',
+    });
+
+    await this.userRepository.update(
+      { id: user.id },
+      { refreshToken: refreshToken },
+    );
+
+    return {
+      accessToken,
+      refreshToken,
+      userId: user.id,
+      username: user.username,
+    };
   }
 
-  async refreshToken(refreshToken: string): Promise<any> {
+  async refreshToken(token: string): Promise<any> {
     try {
-      // 리프레시 토큰 검증
-      const payload = await this.jwtService.verifyAsync(refreshToken);
       const user = await this.userRepository.findOne({
-        where: {
-          id: payload.sub,
-          refreshToken: refreshToken,
-        },
+        where: { refreshToken: token },
       });
 
       if (!user) {
         throw new UnauthorizedException('Invalid refresh token');
       }
 
-      // 새로운 토큰 발급
-      const newPayload = { sub: user.id, username: user.username };
-      const newAccessToken = await this.jwtService.signAsync(newPayload);
-      const newRefreshToken = await this.jwtService.signAsync(newPayload, {
+      const payload = { sub: user.id, username: user.username };
+      const accessToken = await this.jwtService.signAsync(payload);
+      const refreshToken = await this.jwtService.signAsync(payload, {
         expiresIn: '7d',
       });
 
-      // 새로운 리프레시 토큰 저장
       await this.userRepository.update(
         { id: user.id },
-        { refreshToken: newRefreshToken },
+        { refreshToken: refreshToken },
       );
 
       return {
-        accessToken: newAccessToken,
-        refreshToken: newRefreshToken,
-        userId: user.id,
-        username: user.username,
+        accessToken,
+        refreshToken,
       };
     } catch (error) {
       throw new UnauthorizedException('Invalid refresh token');
     }
   }
 
-  async updateProfile(req: any): Promise<any> {
-    return this.userRepository.update(req.id, req);
+  async updateProfile(updateProfileDto: UpdateProfileDto): Promise<any> {
+    const user = await this.userRepository.findOne({
+      where: { id: updateProfileDto.id },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const updateData: any = {};
+
+    if (updateProfileDto.username) {
+      updateData.username = updateProfileDto.username;
+    }
+
+    if (updateProfileDto.password) {
+      updateData.password = await bcrypt.hash(
+        updateProfileDto.password,
+        this.saltOrRounds,
+      );
+    }
+
+    await this.userRepository.update({ id: updateProfileDto.id }, updateData);
+
+    return {
+      message: 'Profile updated successfully',
+    };
   }
 
-  async quit(req: any): Promise<any> {
-    return this.userRepository.delete(req.id);
+  async quit(quitDto: QuitDto): Promise<any> {
+    const user = await this.userRepository.findOne({
+      where: { id: quitDto.id },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    await this.userRepository.delete({ id: quitDto.id });
+
+    return {
+      message: 'Account deleted successfully',
+    };
   }
 }

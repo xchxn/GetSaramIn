@@ -8,6 +8,7 @@ import { CommunityModule } from './modules/community/community.module';
 import { CompanyModule } from './modules/company/company.module';
 import { HttpModule } from '@nestjs/axios';
 import { BookmarksModule } from './modules/bookmarks/bookmarks.module';
+import { EventModule } from './modules/event/event.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { BookmarksModule } from './modules/bookmarks/bookmarks.module';
     CompanyModule,
     HttpModule,
     BookmarksModule,
+    EventModule
   ],
   controllers: [],
   providers: [],

@@ -11,11 +11,12 @@ export class CompanyService {
 	constructor(
 		@Inject('COMPANY_REPOSITORY')
 		private readonly companyRepository: Repository<CompanyEntity>,
+		@Inject('JOBS_REPOSITORY')
 		private readonly jobRepository: Repository<JobsEntity>,
 		private readonly configService: ConfigService,
 	) { }
 
-	async getCompany(req: any): Promise<CompanyEntity[]> {
+	async getCompany(req: any): Promise<any> {
     const browser = await puppeteer.launch({
       headless: true,
     });
@@ -63,6 +64,27 @@ export class CompanyService {
       company_headcount
 		});
 
-		return this.companyRepository.find();
+    const query = await this.companyRepository
+      .createQueryBuilder()
+      .insert()
+      .into(CompanyEntity)
+      .values({
+        company_type,
+        company_scale,
+        company_history,
+        company_homepage,
+        company_address,
+        company_ceo,
+        company_content,
+        company_headcount
+      })
+      .execute();
+    
+      console.log(query);
+    
+    if (page) await page.close();
+    if (browser) await browser.close();
+
+		return true;
 	}
 }

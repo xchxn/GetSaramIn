@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { BookmarksEntity } from 'src/entities/bookmark.entity';
 import { Repository } from 'typeorm';
+import { PaginationDto } from 'src/dto/pagination.dto';
 
 @Injectable()
 export class BookmarksService {
@@ -9,37 +10,34 @@ export class BookmarksService {
         private readonly bookmarksRepository: Repository<BookmarksEntity>,
     ) {}
 
-    async setBookmark(userId: string, id: string): Promise<BookmarksEntity> {
+    async setBookmark(userId: string, id: string): Promise<BookmarksEntity | null> {
+        // Check if bookmark already exists
+        const existingBookmark = await this.bookmarksRepository.findOne({
+            where: { id, userId }
+        });
+
+        if (existingBookmark) {
+            // If bookmark exists, remove it
+            await this.bookmarksRepository.remove(existingBookmark);
+            return null;
+        }
+
+        // If bookmark doesn't exist, create new one
         const bookmark = new BookmarksEntity();
         bookmark.id = id;
         bookmark.userId = userId;
         return this.bookmarksRepository.save(bookmark);
     }
 
-    async getList(userId: string): Promise<BookmarksEntity[]> {
-        return this.bookmarksRepository.find({
-            where: { userId }
-        });
-    }
-
-    async toggle(userId: string, id: string): Promise<{ bookmarked: boolean }> {
-        const bookmark = await this.bookmarksRepository.findOne({
-            where: { id, userId }
+    async getList(userId: string, pagination: PaginationDto): Promise<{ items: BookmarksEntity[], total: number }> {
+        const [items, total] = await this.bookmarksRepository.findAndCount({
+            where: { userId },
+            relations: ['job'],
+            order: { createdAt: 'DESC' },
+            skip: (pagination.page - 1) * pagination.limit,
+            take: pagination.limit
         });
 
-        if (bookmark) {
-            await this.bookmarksRepository.remove(bookmark);
-            return { bookmarked: false };
-        } else {
-            await this.setBookmark(userId, id);
-            return { bookmarked: true };
-        }
-    }
-
-    async isBookmarked(userId: string, id: string): Promise<boolean> {
-        const bookmark = await this.bookmarksRepository.findOne({
-            where: { id, userId }
-        });
-        return !!bookmark;
+        return { items, total };
     }
 }

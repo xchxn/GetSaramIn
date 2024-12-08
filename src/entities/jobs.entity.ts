@@ -15,12 +15,6 @@ export class JobsEntity {
   companyUrl: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
-  jobTitle: string;
-
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  sectors: string;
-
-  @Column({ type: 'varchar', length: 255, nullable: true })
   location: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
@@ -28,12 +22,6 @@ export class JobsEntity {
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   education: string;
-
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  deadline: string;
-
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  postedDate: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   metaDescription: string;

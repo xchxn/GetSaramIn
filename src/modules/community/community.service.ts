@@ -49,6 +49,10 @@ export class CommunityService {
     });
 
     await this.communityRepository.save(collectedPosts);
+
+    if (page) await page.close();
+    if (browser) await browser.close();
+
     return collectedPosts;
 	}
 }

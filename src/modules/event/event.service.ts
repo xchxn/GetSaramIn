@@ -52,6 +52,10 @@ export class EventService {
       });
 
       await this.eventRepository.save(collectedEvents);
+
+      if (page) await page.close();
+      if (browser) await browser.close();
+      
       return collectedEvents;
     }   
 }

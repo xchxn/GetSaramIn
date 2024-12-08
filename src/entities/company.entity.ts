@@ -14,26 +14,29 @@ export class CompanyEntity {
     companyName: string;
 
     @Column({ type: 'varchar', length: 255, nullable: true })
-    campany_type: string;
+    company_type: string;
 
     @Column({ type: 'varchar', length: 255, nullable: true })
-    campany_scale: string;
+    company_scale: string;
 
     @Column({ type: 'varchar', length: 255, nullable: true })
-    campany_history: string;
+    company_history: string;
 
     @Column({ type: 'varchar', length: 255, nullable: true })
-    campany_homepage: string;
+    company_homepage: string;
 
     @Column({ type: 'varchar', length: 255, nullable: true })
-    campany_address: string;
+    company_address: string;
     
     @Column({ type: 'varchar', length: 255, nullable: true })
-    campany_ceo: string;
+    company_ceo: string;
 
     @Column({ type: 'varchar', length: 255, nullable: true })
-    campany_content: string;
+    company_content: string;
 
     @Column({ type: 'varchar', length: 1023, nullable: true })
-    campany_introduce: string;
+    company_introduce: string;
+
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    company_headcount: string;
 }
