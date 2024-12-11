@@ -8,7 +8,7 @@ export class CompanyController {
     ) {}
 
     @Get()
-    getCompanyInformation(@Query() req: any): Promise<any> {
-        return this.companyService.getCompany(req);
+    getCompanyInformation(): Promise<any> {
+        return this.companyService.getCompany();
     }
 }

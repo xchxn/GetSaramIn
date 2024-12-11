@@ -18,13 +18,13 @@ export class JobsEntity {
   location: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
-  experience: string;
-
-  @Column({ type: 'varchar', length: 255, nullable: true })
   education: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
-  metaDescription: string;
+  badge: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  stacks: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   employmentType: string;

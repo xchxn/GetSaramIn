@@ -23,71 +23,96 @@ export class JobsService {
     });
     const baseUrl = this.configService.get('DEFAULT_REQUEST_URL');
 
+    console.log(baseUrl);
+
     const page = await browser.newPage();
-    await page.setDefaultNavigationTimeout(30000);
     // page config
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-    await page.setViewport({ width: 1920, height: 1080 });
 
-    const collectedJobs: JobsEntity[] = [];
-
-    const url = `${baseUrl}//zf_user/jobs/list/job-category?cat_kewd=2239%2C84&panel_type=&search_optional_item=n&search_done=y&panel_count=y&preview=y&page=1&page_count=100`;
+    const url = `${baseUrl}/zf_user/jobs/list/job-category?cat_kewd=81%2C80%2C2248&panel_type=&search_optional_item=n&search_done=y&panel_count=y&preview=y&page=1&page_count=100`;
     try {
       console.log('start crawling');
 
-      await page.goto(url, { waitUntil: 'networkidle0' });
+      await page.goto(url);
       // 페이지가 완전히 로드될 때까지 기다림
       const content = await page.content();
 
       const $ = cheerio.load(content);
 
-      const getTextContent = (selector: string) => {
-        return $(selector).text().trim();
-      };
+      // Find all div elements that have an ID starting with 'rec-'
+      const elements = $('div[id^="rec-"]');
 
-      const getHrefContent = (selector: string) => {
-        return $(selector).attr('href');
-      };
+      console.log('Found job listings:', elements.length);
 
-      // $에서 #rec-12345678 형식 모두 확인하기
-      const elements = $('#rec-49170109')
+      elements.each((index: number, element: any) => {
+        try {
+          const $element = $(element);
+          const id = $element.attr('id')?.replace('rec-', ''); // Extract the numeric ID
+          
+          if (!id) {
+            console.log('Skipping element - no valid ID found');
+            return;
+          }
 
-      console.log(elements);
+          // Extract job information using the proper selectors within this element
+          const title = $element.find('.job_tit a').text().trim();
+          const companyUrl = $element.find('.job_tit a').attr('href');
+          const companyName = $element.find('.col.company_nm a').text().trim();
+          const location = $element.find('.work_place').text().trim();
+          const employmentType = $element.find('.career').text().trim();
+          const education = $element.find('.education').text().trim();
+          const deadline = $element.find('.col.support_info p span.date').text().trim() || 
+                         $element.find('div.box_item div.col.support_info p span.date').text().trim();
+          
+          // Extract job meta information (기술스택, 우대사항 등)
+          const stacks = $element.find('div.box_item div.col.notification_info div.job_meta span span')
+            .map((_, span) => $(span).text().trim())
+            .get()
+            .filter(text => text.length > 0);
 
-      elements.each((element: any) => {
-        const id = $(element).attr('id'); // 요소의 ID 가져오기
-        console.log('Found element ID:', id);
+          // Extract job badges (정규직, 경력 등)
+          const badge = $element.find('.job_badge span').text().trim()
+          
+          console.log(`Processing job ID ${id}:`, { 
+            title, 
+            companyName,
+            companyUrl,
+            location,
+            employmentType,
+            education,
+            deadline,
+            stacks,
+            badge,
+          });
 
-        const company_nm = getTextContent(`#rec-${id} > div.box_item > div.col.company_nm > span.str_tit`);
-        const title = getTextContent(`#rec_link_${id} > span`);
-        const stack_text = getTextContent(`#rec-${id} > div.box_item > div.col.notification_info > div.job_meta > span > span:nth-child(1)`);
-        const badge_text = getTextContent(`#rec-${id} > div.box_item > div.col.notification_info > div.job_badge > span`);
-        const work_place = getTextContent(`#rec-${id} > div.box_item > div.col.recruit_info > ul > li:nth-child(1) > p`);
-        const career = getTextContent(`#rec-${id} > div.box_item > div.col.recruit_info > ul > li:nth-child(2) > p`);
-        const education = getTextContent(`#rec-${id} > div.box_item > div.col.recruit_info > ul > li:nth-child(3) > p`);
-        const deadline = getTextContent(`#rec-${id} > div.box_item > div.col.support_info > p > span.date`);
-        const url_href = getHrefContent(`#rec_link_${id}`);
+          const res = this.jobsRepository
+            .createQueryBuilder()
+            .insert()
+            .values({
+              id,
+              title,
+              companyName,
+              companyUrl,
+              location,
+              employmentType,
+              stacks,
+              education,
+              deadline,
+              badge,
+            })
+            .execute();
 
-        console.log({
-          id,
-          company_nm,
-          title,
-          stack_text,
-          badge_text,
-          work_place,
-          career,
-          education,
-          deadline,
-          url_href
-        });
+          console.log(res);
+        } catch (error) {
+          console.error('Error processing job element:', error);
+        }
       });
 
-      await page.close();
-
-      return `Successfully crawled and saved ${collectedJobs.length} jobs`;
+      return {
+        success: true,
+        data: `Successfully crawled jobs`
+      };
     } catch (error) {
-      if (page) await page.close();
-      if (browser) await browser.close();
       console.error('Crawling error:', error);
       throw new Error(`Crawling failed: ${error.message}`);
     } finally {

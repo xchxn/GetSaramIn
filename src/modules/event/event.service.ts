@@ -1,8 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { EventsEntity } from 'src/entities/event.entity';
 import { Repository } from 'typeorm';
-import * as puppeteer from 'puppeteer';
-import * as cheerio from 'cheerio';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
@@ -14,6 +12,9 @@ export class EventService {
       ) {}
 
     async getEvents(): Promise<EventsEntity[]> {
+      const cheerio = require('cheerio');
+      const puppeteer = require('puppeteer');
+
       const browser = await puppeteer.launch({
         headless: true,
       });
@@ -26,8 +27,7 @@ export class EventService {
       const url = `${baseUrl}/zf_user/help/live?category=3`;
   
       await page.goto(url);
-      // 페이지가 완전히 로드될 때까지 기다림
-      await page.waitForSelector('#content', { timeout: 120000 });
+      
       const content = await page.content();
       
       const $ = cheerio.load(content);
@@ -40,18 +40,14 @@ export class EventService {
         const date = $(element).find('a > span.date').text().trim();
         const target = $(element).find('a > span.target').text().trim();
 
-        if (title && date) {
-          const eventEntity = new EventsEntity();
-          Object.assign(eventEntity, {
-            title,
-            date,
-            target
-          });
-          collectedEvents.push(eventEntity);
-        }
+        const res = this.eventRepository
+          .createQueryBuilder()
+          .insert()
+          .values({ id: index, title, date, target })
+          .execute();
+        
+        console.log(res);
       });
-
-      await this.eventRepository.save(collectedEvents);
 
       if (page) await page.close();
       if (browser) await browser.close();

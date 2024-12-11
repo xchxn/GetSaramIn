@@ -19,7 +19,7 @@ export class JobsController {
   })
   @ApiResponse({ status: 500, description: 'Internal server error during crawling' })
   @Get('crawl')
-  async crawlJobs(): Promise<ApiResponseDto<JobsEntity[]>> {
+  async crawlJobs(): Promise<any> {
     const response = await this.jobsService.crawlingJobs();
     if (!response.success) {
       throw new HttpException(response.error, HttpStatus.INTERNAL_SERVER_ERROR);
