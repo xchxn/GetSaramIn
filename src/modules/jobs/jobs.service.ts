@@ -2,11 +2,8 @@ import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { JobsEntity } from 'src/entities/jobs.entity';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import * as puppeteer from 'puppeteer';
-import * as cheerio from 'cheerio';
 import { GetJobsDto } from 'src/dto/get-jobs.dto';
 import { ApiResponseDto, ErrorCodes } from 'src/dto/api-response.dto';
-import { timeout } from 'rxjs';
 
 @Injectable()
 export class JobsService {
@@ -18,7 +15,8 @@ export class JobsService {
 
   // 크롤링
   async crawlingJobs(): Promise<any> {
-    const fs = require('fs');
+    const puppeteer = require('puppeteer');
+    const cheerio = require('cheerio');
 
     const browser = await puppeteer.launch({
       headless: true,
@@ -26,128 +24,75 @@ export class JobsService {
     const baseUrl = this.configService.get('DEFAULT_REQUEST_URL');
 
     const page = await browser.newPage();
-
+    await page.setDefaultNavigationTimeout(30000);
     // page config
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    await page.setViewport({ width: 1920, height: 1080 });
 
     const collectedJobs: JobsEntity[] = [];
 
+    const url = `${baseUrl}//zf_user/jobs/list/job-category?cat_kewd=2239%2C84&panel_type=&search_optional_item=n&search_done=y&panel_count=y&preview=y&page=1&page_count=100`;
     try {
-      for (let i = 49488761; i <= 49488860; i++) {
-        const url = `${baseUrl}/zf_user/jobs/relay/view?view_type=list&rec_idx=${i}`;
+      console.log('start crawling');
 
-        await page.goto(url);
-        // 페이지가 완전히 로드될 때까지 기다림
-        await page.waitForSelector('#content', { timeout: 120000 });
-        const content = await page.content();
-        
-        const $ = cheerio.load(content);
+      await page.goto(url, { waitUntil: 'networkidle0' });
+      // 페이지가 완전히 로드될 때까지 기다림
+      const content = await page.content();
 
-        const getTextContent = (selector: string) => {
-          return $(selector).text().trim();
-        };
+      const $ = cheerio.load(content);
 
-        const getHrefContent = (selector: string) => {
-          return $(selector).attr('href');
-        };
+      const getTextContent = (selector: string) => {
+        return $(selector).text().trim();
+      };
 
-        const id = `${i}`;
-        
-        const companyName = getTextContent(`.wrap_jview > section.jview.jview-0-${i} > div.wrap_jv_cont > div.wrap_jv_header > div > div.title_inner > a.company`);
-        const companyUrl = getHrefContent(`.wrap_jview > section.jview.jview-0-${i} > div.wrap_jv_cont > div.wrap_jv_header > div > div.title_inner > a.company`);
-        const title = getTextContent(`.wrap_jview > section.jview.jview-0-${i} > div.wrap_jv_cont > div.wrap_jv_header > div > h1`);
-        const experience = getTextContent(`.wrap_jview > section.jview.jview-0-${i} > div.wrap_jv_cont > div.jv_cont.jv_summary > div > div:nth-child(1) > dl:nth-child(1) > dd > strong`);
-        const education = getTextContent(`.wrap_jview > section.jview.jview-0-${i} > div.wrap_jv_cont > div.jv_cont.jv_summary > div > div:nth-child(1) > dl:nth-child(2) > dd > strong`);
-        const employmentType = getTextContent(`.wrap_jview > section.jview.jview-0-${i} > div.wrap_jv_cont > div.jv_cont.jv_summary > div > div:nth-child(1) > dl:nth-child(3) > dd > strong`);
-        const salary = getTextContent(`.wrap_jview > section.jview.jview-0-${i} > div.wrap_jv_cont > div.jv_cont.jv_summary > div > div:nth-child(2) > dl:nth-child(1) > dd`);
-        const location = getTextContent(`.wrap_jview > section.jview.jview-0-${i} > div.wrap_jv_cont > div.jv_cont.jv_summary > div > div:nth-child(2) > dl:nth-child(2) > dd`);
-        
-        const metaDescription = $('head > meta:nth-child(7)').attr('content') || '';
-        
+      const getHrefContent = (selector: string) => {
+        return $(selector).attr('href');
+      };
+
+      // $에서 #rec-12345678 형식 모두 확인하기
+      const elements = $('#rec-49170109')
+
+      console.log(elements);
+
+      elements.each((element: any) => {
+        const id = $(element).attr('id'); // 요소의 ID 가져오기
+        console.log('Found element ID:', id);
+
+        const company_nm = getTextContent(`#rec-${id} > div.box_item > div.col.company_nm > span.str_tit`);
+        const title = getTextContent(`#rec_link_${id} > span`);
+        const stack_text = getTextContent(`#rec-${id} > div.box_item > div.col.notification_info > div.job_meta > span > span:nth-child(1)`);
+        const badge_text = getTextContent(`#rec-${id} > div.box_item > div.col.notification_info > div.job_badge > span`);
+        const work_place = getTextContent(`#rec-${id} > div.box_item > div.col.recruit_info > ul > li:nth-child(1) > p`);
+        const career = getTextContent(`#rec-${id} > div.box_item > div.col.recruit_info > ul > li:nth-child(2) > p`);
+        const education = getTextContent(`#rec-${id} > div.box_item > div.col.recruit_info > ul > li:nth-child(3) > p`);
+        const deadline = getTextContent(`#rec-${id} > div.box_item > div.col.support_info > p > span.date`);
+        const url_href = getHrefContent(`#rec_link_${id}`);
+
         console.log({
           id,
-          companyName,
-          companyUrl,
+          company_nm,
           title,
-          experience,
+          stack_text,
+          badge_text,
+          work_place,
+          career,
           education,
-          employmentType,
-          salary,
-          location,
-          metaDescription
+          deadline,
+          url_href
         });
+      });
 
-        if ([experience, education, employmentType, salary, location, companyName].some(value => value)) {
-          const jobEntity = new JobsEntity();
-          Object.assign(jobEntity, {
-            id,
-            title,
-            experience,
-            education,
-            employmentType,
-            salary,
-            location,
-            companyName,
-            companyUrl,
-            metaDescription
-          });
-          collectedJobs.push(jobEntity);
-        }
-      }
-
-      await this.saveOptimized(collectedJobs);
+      await page.close();
 
       return `Successfully crawled and saved ${collectedJobs.length} jobs`;
     } catch (error) {
+      if (page) await page.close();
+      if (browser) await browser.close();
       console.error('Crawling error:', error);
       throw new Error(`Crawling failed: ${error.message}`);
     } finally {
       if (page) await page.close();
       if (browser) await browser.close();
-    }
-  }
-  // 크롤링 요청 배치+병렬 전략으로 최적화
-  private async saveOptimized(jobs: any[]) {
-    const batchSize = 100;
-    const concurrentBatches = 3;
-
-    const totalBatches = Math.ceil(jobs.length / batchSize);
-    console.log(
-      `Starting to process ${jobs.length} jobs in ${totalBatches} batches`,
-    );
-
-    for (let i = 0; i < totalBatches; i += concurrentBatches) {
-      const batchPromises = [];
-
-      for (let j = 0; j < concurrentBatches && i + j < totalBatches; j++) {
-        const start = (i + j) * batchSize;
-        const batch = jobs.slice(start, start + batchSize);
-
-        batchPromises.push(
-          Promise.all(
-            batch.map(async (job) => {
-              try {
-                const jobEntity = this.jobsRepository.create(job);
-                await this.jobsRepository.save(jobEntity);
-                console.log(`Saved job ${job.id}`);
-              } catch (error) {
-                if (error.code === 'ER_DUP_ENTRY') {
-                  await this.jobsRepository.update({ id: job.id }, job);
-                  console.log(`Updated existing job ${job.id}`);
-                } else {
-                  console.error(`Error processing job ${job.id}:`, error);
-                }
-              }
-            }),
-          ),
-        );
-      }
-
-      await Promise.all(batchPromises);
-      console.log(`Completed batch group ${i / concurrentBatches + 1}`);
-
-      // 다음 배치 그룹 처리 전 잠시 대기
-      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
 

@@ -34,4 +34,7 @@ export class JobsEntity {
 
   @Column({ type: 'int', default: 0 })
   viewCount: number;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  deadline: string;
 }
