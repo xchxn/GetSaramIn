@@ -53,5 +53,13 @@ export class EventService {
       if (browser) await browser.close();
       
       return collectedEvents;
-    }   
+    }
+
+    async getEventList(): Promise<EventsEntity[]> {
+      return this.eventRepository.find();
+    }
+
+    async getEventById(id: number): Promise<EventsEntity> {
+      return this.eventRepository.findOne({ where: { id } });
+    }
 }

@@ -80,4 +80,15 @@ export class CompanyService {
 
     return true;
   }
+
+  async getCompanylist(): Promise<any> {
+    const list = await this.companyRepository.find();
+    return list;
+  }
+
+  async getCompanyById(id: any): Promise<any> {
+    const target = await this.companyRepository.findOne({ where: { id } });
+
+    return target;
+  }
 }

@@ -75,4 +75,12 @@ export class CommunityService {
 
     return collectedPosts;
   }
+
+  async getPostList(): Promise<CommunityEntity[]> {
+    return this.communityRepository.find();
+  }
+
+  async getPostById(id: number): Promise<CommunityEntity> {
+    return this.communityRepository.findOne({ where: { id } });
+  }
 }
