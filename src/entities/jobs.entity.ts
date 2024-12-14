@@ -23,8 +23,8 @@ export class JobsEntity {
   @Column({ type: 'varchar', length: 255, nullable: true })
   badge: string;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  stacks: string;
+  @Column('simple-array', { nullable: true })
+  stacks: string[];
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   employmentType: string;

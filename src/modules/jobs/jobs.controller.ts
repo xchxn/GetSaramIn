@@ -9,21 +9,50 @@ import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam } from '@nestjs/
 @Controller('jobs')
 export class JobsController {
   constructor(private readonly jobsService: JobsService) {}
-
-  @ApiOperation({ summary: 'Crawl jobs from external sources' })
+  @ApiOperation({ 
+    summary: '채용 정보 크롤링',
+    description: '사람인 사이트에서 채용 정보를 크롤링합니다.'
+  })
+  
   @ApiResponse({ 
     status: 200, 
-    description: 'Jobs crawled successfully',
-    type: JobsEntity,
-    isArray: true 
+    description: '크롤링 성공',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        data: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', example: '12345' },
+              title: { type: 'string', example: '백엔드 개발자' },
+              companyName: { type: 'string', example: '(주)회사' },
+              companyUrl: { type: 'string', example: 'https://example.com' },
+              location: { type: 'string', example: '서울 강남구' },
+              experience: { type: 'string', example: '신입·경력' },
+              education: { type: 'string', example: '학력무관' }
+            }
+          }
+        }
+      }
+    }
   })
-  @ApiResponse({ status: 500, description: 'Internal server error during crawling' })
+  @ApiResponse({ 
+    status: 500, 
+    description: '크롤링 실패',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: false },
+        error: { type: 'string', example: 'Internal server error during crawling' }
+      }
+    }
+  })
   @Get('crawl')
   async crawlJobs(): Promise<any> {
     const response = await this.jobsService.crawlingJobs();
-    if (!response.success) {
-      throw new HttpException(response.error, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
     return response;
   }
 

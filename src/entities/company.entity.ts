@@ -6,10 +6,6 @@ export class CompanyEntity {
     @PrimaryColumn()
     id: string;
 
-    @OneToOne(() => JobsEntity)
-    @JoinColumn({ name: 'id' })
-    job: JobsEntity;
-
     @Column({ type: 'varchar', length: 255, nullable: true })
     companyName: string;
 

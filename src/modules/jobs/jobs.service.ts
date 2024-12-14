@@ -20,7 +20,14 @@ export class JobsService {
 
     const browser = await puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--disable-gpu',
+        '--window-size=1920x1080'
+      ]
     });
     const baseUrl = this.configService.get('DEFAULT_REQUEST_URL');
 
@@ -29,30 +36,36 @@ export class JobsService {
     const page = await browser.newPage();
     // page config
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-
+    await page.setRequestInterception(true);
+    page.on('request', (request) => {
+      const resourceType = request.resourceType();
+      if (['image', 'stylesheet', 'font', 'media'].includes(resourceType)) {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
     // Set default timeout
-    page.setDefaultNavigationTimeout(60000); // 60초로 타임아웃 증가
-    page.setDefaultTimeout(60000);
+    page.setDefaultNavigationTimeout(240000); // 60초로 타임아웃 증가
+    page.setDefaultTimeout(240000);
 
-    const url = `${baseUrl}/zf_user/jobs/list/job-category?cat_kewd=81&panel_type=&search_optional_item=n&search_done=y&panel_count=y&preview=y&page=1&page_count=100`;
+    await page.setViewport({ width: 1920, height: 1080 });
+    await page.setCacheEnabled(false);
+
+    const url = `${baseUrl}/zf_user/jobs/list/job-category?cat_mcls=2&panel_type=&search_optional_item=n&search_done=y&panel_count=y&preview=y&page=1&page_count=100`;
     // const url = `${baseUrl}/zf_user/jobs/list/job-category?cat_kewd=81&tab_type=default&panel_type=&search_optional_item=n&search_done=n&panel_count=n&smart_tag=&page=1&page_count=100`;
     try {
       console.log('start crawling',url);
 
       await page.goto(url, {
-        waitUntil: 'networkidle2',
-        timeout: 120000
+        waitUntil: ['domcontentloaded', 'networkidle2'],
+        timeout: 0
       });
 
       // 특정 요소가 로드될 때까지 기다림
-      try {
-        await page.waitForSelector('div[id^="rec-"]', { timeout: 0 });
-      } catch (error) {
-        console.log('Waiting for job listings timed out');
-      }
+      await page.waitForSelector('#default_list_wrap > section > div', { timeout: 0 });
 
       const content = await page.content();
-      console.log('Page content length:', content.length);
 
       const $ = cheerio.load(content);
 
@@ -85,10 +98,14 @@ export class JobsService {
             $element.find('div.box_item div.col.support_info p span.date').text().trim();
 
           // Extract job meta information (기술스택, 우대사항 등)
-          const stacks = $element.find('div.box_item div.col.notification_info div.job_meta span span')
-            .map((_, span) => $(span).text().trim())
-            .get()
-            .filter(text => text.length > 0);
+          const stackElements = $element.find('div.box_item div.col.notification_info div.job_meta span span');
+          const stacks: string[] = [];
+          stackElements.each((_, stackElement) => {
+            stacks.push($(stackElement).text().trim());
+          });
+            // .map((_, span) => $(span).text().trim())
+            // .get()
+            // .filter(text => text.length > 0);
 
           // Extract job badges (정규직, 경력 등)
           const badge = $element.find('.job_badge span').text().trim()
@@ -104,16 +121,8 @@ export class JobsService {
             stacks,
             badge,
           });
-          const duplicate = this.jobsRepository
-            .createQueryBuilder()
-            .where('id = :id', { id })
-            .getOne();
 
-          if (duplicate) {
-            console.log('Duplicate job ID found:', id);
-            return;
-          } else {
-            const res = this.jobsRepository
+          const res = this.jobsRepository
             .createQueryBuilder()
             .insert()
             .values({
@@ -131,7 +140,7 @@ export class JobsService {
             .execute();
 
           console.log(res);
-          }
+
         } catch (error) {
           console.error('Error processing job element:', error);
         }
