@@ -20,23 +20,47 @@ export class CompanyService {
 
     const browser = await puppeteer.launch({
       headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--disable-gpu',
+        '--window-size=1920x1080'
+      ]
     });
+
     const baseUrl = this.configService.get('DEFAULT_REQUEST_URL');
 
     const page = await browser.newPage();
 
     // page config
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    await page.setRequestInterception(true);
+    page.on('request', (request) => {
+      const resourceType = request.resourceType();
+      if (['image', 'stylesheet', 'font', 'media'].includes(resourceType)) {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
+
+    await page.setViewport({ width: 1920, height: 1080 });
+    await page.setCacheEnabled(false);
+
     const companys = await this.jobRepository
       .createQueryBuilder()
       .select('companyUrl')
       .addSelect('id')
       .distinct(true)
+      .where('companyUrl IS NOT NULL')  // NULL이 아닌 데이터만 선택
+      .andWhere('companyUrl != :empty', { empty: '' })  // 빈 문자열도 제외
+      .orderBy('companyUrl', 'ASC')
+      .take(50)
       .getRawMany();
 
     console.log(companys);
-
-    const companyDataArray = [];
 
     for await (const element of companys) {
       // 쿼리 문자열 부분만 자르기
@@ -59,8 +83,8 @@ export class CompanyService {
       console.log(url);
 
       await page.goto(url, {
-        waitUntil: 'networkidle2',
-        timeout: 60000
+        waitUntil: ['domcontentloaded', 'networkidle2'],
+        timeout: 0
       });
 
       const content = await page.content();
@@ -88,28 +112,33 @@ export class CompanyService {
         company_headcount
       });
 
-      if(this.companyRepository.findOne({ where: { id: element.id } })) {
+      const existingCompany = await this.companyRepository.findOne({
+        where: { id: element.id }
+      });
+
+      if (existingCompany) {
+        console.log(`Company with ID ${element.id} already exists, skipping...`);
         continue;
       }
-      
-      companyDataArray.push({
-        id: element.id,
-        company_type,
-        company_scale,
-        company_history,
-        company_homepage,
-        company_address,
-        company_ceo,
-        company_content,
-        company_headcount
-      });
-    };
 
-    await this.companyRepository
+      const result = await this.companyRepository
         .createQueryBuilder()
         .insert()
-        .values(companyDataArray)
-        .execute()
+        .values({
+          id: element.id,
+          company_type,
+          company_scale,
+          company_history,
+          company_homepage,
+          company_address,
+          company_ceo,
+          company_content,
+          company_headcount
+        })
+        .execute();
+
+      console.log(result);
+    };
 
     if (page) await page.close();
     if (browser) await browser.close();

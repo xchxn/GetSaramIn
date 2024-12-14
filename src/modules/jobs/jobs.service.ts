@@ -52,7 +52,7 @@ export class JobsService {
     await page.setViewport({ width: 1920, height: 1080 });
     await page.setCacheEnabled(false);
 
-    const url = `${baseUrl}/zf_user/jobs/list/job-category?cat_mcls=2&panel_type=&search_optional_item=n&search_done=y&panel_count=y&preview=y&page=1&page_count=100`;
+    const url = `${baseUrl}/zf_user/jobs/list/job-category?cat_mcls=2&panel_type=&search_optional_item=n&search_done=y&panel_count=y&preview=y&page=3&page_count=100`;
     // const url = `${baseUrl}/zf_user/jobs/list/job-category?cat_kewd=81&tab_type=default&panel_type=&search_optional_item=n&search_done=n&panel_count=n&smart_tag=&page=1&page_count=100`;
     try {
       console.log('start crawling',url);
@@ -87,9 +87,18 @@ export class JobsService {
             return;
           }
 
+          const existingJobs = this.jobsRepository.findOne({
+            where: { id: id }
+          });
+    
+          if (existingJobs) {
+            console.log(`Company with ID ${element.id} already exists, skipping...`);
+            return;
+          }
+
           // Extract job information using the proper selectors within this element
           const title = $element.find('.job_tit a').text().trim();
-          const companyUrl = $element.find('.job_tit a').attr('href');
+          const companyUrl = $element.find('.col.company_nm a').attr('href');
           const companyName = $element.find('.col.company_nm a').text().trim();
           const location = $element.find('.work_place').text().trim();
           const employmentType = $element.find('.career').text().trim();
