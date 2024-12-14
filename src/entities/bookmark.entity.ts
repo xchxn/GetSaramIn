@@ -3,7 +3,7 @@ import { JobsEntity } from './jobs.entity';
 
 @Entity()
 export class BookmarksEntity {
-    @PrimaryColumn({ type: 'varchar', length: 255 })
+    @PrimaryColumn()
     id: string;
     
     @OneToOne(() => JobsEntity)

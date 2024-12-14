@@ -20,6 +20,7 @@ export class JobsService {
 
     const browser = await puppeteer.launch({
       headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
     const baseUrl = this.configService.get('DEFAULT_REQUEST_URL');
 
@@ -29,15 +30,34 @@ export class JobsService {
     // page config
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
-    const url = `${baseUrl}/zf_user/jobs/list/job-category?cat_kewd=81%2C80%2C2248&panel_type=&search_optional_item=n&search_done=y&panel_count=y&preview=y&page=1&page_count=100`;
-    try {
-      console.log('start crawling');
+    // Set default timeout
+    page.setDefaultNavigationTimeout(60000); // 60초로 타임아웃 증가
+    page.setDefaultTimeout(60000);
 
-      await page.goto(url);
-      // 페이지가 완전히 로드될 때까지 기다림
+    const url = `${baseUrl}/zf_user/jobs/list/job-category?cat_kewd=81&panel_type=&search_optional_item=n&search_done=y&panel_count=y&preview=y&page=1&page_count=100`;
+    // const url = `${baseUrl}/zf_user/jobs/list/job-category?cat_kewd=81&tab_type=default&panel_type=&search_optional_item=n&search_done=n&panel_count=n&smart_tag=&page=1&page_count=100`;
+    try {
+      console.log('start crawling',url);
+
+      await page.goto(url, {
+        waitUntil: 'networkidle2',
+        timeout: 120000
+      });
+
+      // 특정 요소가 로드될 때까지 기다림
+      try {
+        await page.waitForSelector('div[id^="rec-"]', { timeout: 0 });
+      } catch (error) {
+        console.log('Waiting for job listings timed out');
+      }
+
       const content = await page.content();
+      console.log('Page content length:', content.length);
 
       const $ = cheerio.load(content);
+
+      // 페이지 HTML 구조 확인을 위한 로깅
+      console.log('Page title:', $('title').text());
 
       // Find all div elements that have an ID starting with 'rec-'
       const elements = $('div[id^="rec-"]');
@@ -48,7 +68,7 @@ export class JobsService {
         try {
           const $element = $(element);
           const id = $element.attr('id')?.replace('rec-', ''); // Extract the numeric ID
-          
+
           if (!id) {
             console.log('Skipping element - no valid ID found');
             return;
@@ -61,9 +81,9 @@ export class JobsService {
           const location = $element.find('.work_place').text().trim();
           const employmentType = $element.find('.career').text().trim();
           const education = $element.find('.education').text().trim();
-          const deadline = $element.find('.col.support_info p span.date').text().trim() || 
-                         $element.find('div.box_item div.col.support_info p span.date').text().trim();
-          
+          const deadline = $element.find('.col.support_info p span.date').text().trim() ||
+            $element.find('div.box_item div.col.support_info p span.date').text().trim();
+
           // Extract job meta information (기술스택, 우대사항 등)
           const stacks = $element.find('div.box_item div.col.notification_info div.job_meta span span')
             .map((_, span) => $(span).text().trim())
@@ -72,9 +92,9 @@ export class JobsService {
 
           // Extract job badges (정규직, 경력 등)
           const badge = $element.find('.job_badge span').text().trim()
-          
-          console.log(`Processing job ID ${id}:`, { 
-            title, 
+
+          console.log(`Processing job ID ${id}:`, {
+            title,
             companyName,
             companyUrl,
             location,
@@ -84,8 +104,16 @@ export class JobsService {
             stacks,
             badge,
           });
+          const duplicate = this.jobsRepository
+            .createQueryBuilder()
+            .where('id = :id', { id })
+            .getOne();
 
-          const res = this.jobsRepository
+          if (duplicate) {
+            console.log('Duplicate job ID found:', id);
+            return;
+          } else {
+            const res = this.jobsRepository
             .createQueryBuilder()
             .insert()
             .values({
@@ -103,6 +131,7 @@ export class JobsService {
             .execute();
 
           console.log(res);
+          }
         } catch (error) {
           console.error('Error processing job element:', error);
         }

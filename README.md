@@ -60,6 +60,7 @@ npm install
 Create a `.env` file in the root directory with the following variables:
 ```env
 DEFAULT_REQUEST_URL=[base-url-for-crawling]
+CARRER_REQUEST_URL=[base-url-for-other-crawling]
 DATABASE_HOST=
 DATABASE_PORT=
 DATABASE_USERNAME=

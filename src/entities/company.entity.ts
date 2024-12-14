@@ -3,7 +3,7 @@ import { JobsEntity } from './jobs.entity';
 
 @Entity('company')
 export class CompanyEntity {
-    @PrimaryColumn('varchar')
+    @PrimaryColumn()
     id: string;
 
     @OneToOne(() => JobsEntity)
