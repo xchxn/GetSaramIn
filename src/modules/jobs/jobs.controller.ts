@@ -13,7 +13,7 @@ export class JobsController {
     summary: '채용 정보 크롤링',
     description: '사람인 사이트에서 채용 정보를 크롤링합니다.'
   })
-  
+
   @ApiResponse({ 
     status: 200, 
     description: '크롤링 성공',
@@ -81,15 +81,49 @@ export class JobsController {
     return response;
   }
 
-  @ApiOperation({ summary: 'Get job by ID' })
-  @ApiParam({ name: 'id', description: 'Job ID' })
+  @ApiOperation({
+    summary: '채용 공고 상세 조회',
+    description: '특정 ID의 채용 공고를 조회합니다.'
+  })
   @ApiResponse({
     status: 200,
-    description: 'Job found successfully',
-    type: JobsEntity
+    description: '채용 공고 조회 성공',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        data: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', example: '12345' },
+            title: { type: 'string', example: '백엔드 개발자' },
+            companyName: { type: 'string', example: '(주)회사' },
+            companyUrl: { type: 'string', example: 'https://example.com' },
+            location: { type: 'string', example: '서울 강남구' },
+            experience: { type: 'string', example: '신입·경력' },
+            education: { type: 'string', example: '학력무관' },
+            stacks: { 
+              type: 'array', 
+              items: { type: 'string' },
+              example: ['Node.js', 'TypeScript', 'NestJS'] 
+            }
+          }
+        }
+      }
+    }
   })
-  @ApiResponse({ status: 404, description: 'Job not found' })
-  @ApiResponse({ status: 500, description: 'Internal server error' })
+  @ApiResponse({
+    status: 404,
+    description: '채용 공고를 찾을 수 없음',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Job with ID 12345 not found' },
+        error: { type: 'string', example: 'Not Found' },
+        statusCode: { type: 'number', example: 404 }
+      }
+    }
+  })
   @Get(':id')
   async getJobById(@Param('id') id: string): Promise<ApiResponseDto<JobsEntity>> {
     const response = await this.jobsService.getJobById(id);

@@ -261,34 +261,24 @@ export class JobsService {
   // 특정 채용 공고 조회
   async getJobById(id: string): Promise<ApiResponseDto<JobsEntity>> {
     try {
-      const job = await this.jobsRepository.findOne({ where: { id } });
+      const job = await this.jobsRepository.findOne({
+        where: { id }
+      });
 
       if (!job) {
-        return {
-          success: false,
-          error: {
-            code: ErrorCodes.JOB_NOT_FOUND,
-            message: `Job with ID ${id} not found`
-          }
-        };
+        throw new NotFoundException(`Job with ID ${id} not found`);
       }
-
-      // Increment view count
-      job.viewCount = job.viewCount + 1;
-      await this.jobsRepository.save(job);
 
       return {
         success: true,
         data: job
       };
     } catch (error) {
-      return {
-        success: false,
-        error: {
-          code: ErrorCodes.INTERNAL_ERROR,
-          message: 'Failed to fetch job details'
-        }
-      };
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      console.error('Error in getJobById:', error);
+      throw new Error(`Failed to get job: ${error.message}`);
     }
   }
 }
