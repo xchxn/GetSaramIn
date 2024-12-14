@@ -92,7 +92,7 @@ export class JobsService {
           });
     
           if (existingJobs) {
-            console.log(`Company with ID ${element.id} already exists, skipping...`);
+            console.log(`Job with ID ${id} already exists, skipping...`);
             return;
           }
 
