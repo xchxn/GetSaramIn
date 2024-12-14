@@ -1,30 +1,50 @@
+import { IsOptional, IsString, IsNumber, IsArray, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class GetJobsDto {
-  @ApiPropertyOptional({ description: 'Search term for jobs' })
-  readonly search?: string;
+  @ApiPropertyOptional({ description: '전체 검색어' })
+  @IsOptional()
+  @IsString()
+  search?: string;
 
-  @ApiPropertyOptional({ description: 'Keyword to filter jobs' })
-  readonly keyword?: string;
+  @ApiPropertyOptional({ description: '제목 검색어' })
+  @IsOptional()
+  @IsString()
+  keyword?: string;
 
-  @ApiPropertyOptional({ description: 'Company name to filter jobs' })
-  readonly company?: string;
+  @ApiPropertyOptional({ description: '회사명' })
+  @IsOptional()
+  @IsString()
+  company?: string;
 
-  @ApiPropertyOptional({ description: 'Job category' })
-  readonly category?: string;
+  @ApiPropertyOptional({ description: '지역' })
+  @IsOptional()
+  @IsString()
+  location?: string;
 
-  @ApiPropertyOptional({ description: 'Job location' })
-  readonly location?: string;
+  @ApiPropertyOptional({ description: '경력' })
+  @IsOptional()
+  @IsString()
+  experience?: string;
 
-  @ApiPropertyOptional({ description: 'Required experience level' })
-  readonly experience?: string;
+  @ApiPropertyOptional({ description: '기술 스택', type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  stacks?: string[];
 
-  @ApiPropertyOptional({ description: 'Page number for pagination', default: 1 })
-  readonly page?: number;
+  @ApiPropertyOptional({ description: '페이지 번호', minimum: 1, default: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  page?: number = 1;
 
-  @ApiPropertyOptional({ description: 'Number of items per page', default: 10 })
-  readonly limit?: number;
-
-  @ApiPropertyOptional({ description: 'Number of views for the job' })
-  readonly viewCount?: number;
+  @ApiPropertyOptional({ description: '페이지당 항목 수', minimum: 1, default: 10 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  limit?: number = 10;
 }

@@ -166,74 +166,95 @@ export class JobsService {
         search,
         keyword,
         company,
-        category,
         location,
         experience,
+        stacks,
         page = 1,
         limit = 10,
       } = getJobsDto;
 
       const queryBuilder = this.jobsRepository.createQueryBuilder('job');
+      const offset = (page - 1) * limit;
 
+      // 기본 정렬: 최신순
+      queryBuilder.orderBy('job.id', 'DESC');
+
+      // 검색 조건 추가
       if (search) {
-        queryBuilder.where(
-          '(job.title ILIKE :search OR job.description ILIKE :search OR job.company ILIKE :search)',
-          { search: `%${search}%` },
+        queryBuilder.andWhere(
+          '(job.title ILIKE :search OR job.companyName ILIKE :search)',
+          { search: `%${search}%` }
         );
       }
 
       if (keyword) {
         queryBuilder.andWhere('job.title ILIKE :keyword', {
-          keyword: `%${keyword}%`,
+          keyword: `%${keyword}%`
         });
       }
 
       if (company) {
-        queryBuilder.andWhere('job.company ILIKE :company', {
-          company: `%${company}%`,
+        queryBuilder.andWhere('job.companyName ILIKE :company', {
+          company: `%${company}%`
         });
-      }
-
-      if (category) {
-        queryBuilder.andWhere('job.category = :category', { category });
       }
 
       if (location) {
         queryBuilder.andWhere('job.location ILIKE :location', {
-          location: `%${location}%`,
+          location: `%${location}%`
         });
       }
 
       if (experience) {
-        queryBuilder.andWhere('job.experience = :experience', { experience });
+        queryBuilder.andWhere('job.experience ILIKE :experience', {
+          experience: `%${experience}%`
+        });
       }
 
-      const skip = (page - 1) * limit;
-      queryBuilder.skip(skip).take(limit);
-      queryBuilder.orderBy('job.createdAt', 'DESC');
+      // 기술 스택 필터링
+      if (stacks && stacks.length > 0) {
+        const stackConditions = stacks.map(stack => 
+          `job.stacks ILIKE :${stack}`
+        ).join(' OR ');
+        
+        const stackParams = stacks.reduce((acc, stack) => ({
+          ...acc,
+          [stack]: `%${stack}%`
+        }), {});
 
-      const [jobs, total] = await queryBuilder.getManyAndCount();
+        queryBuilder.andWhere(`(${stackConditions})`, stackParams);
+      }
+
+      // 전체 개수 조회
+      const total = await queryBuilder.getCount();
+
+      // 페이지네이션 적용
+      queryBuilder
+        .skip(offset)
+        .take(limit);
+
+      const data = await queryBuilder.getMany();
+      
+      // 메타 데이터 구성
+      const meta = {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / limit),
+        hasNextPage: offset + limit < total,
+        hasPreviousPage: page > 1
+      };
 
       return {
         success: true,
         data: {
-          data: jobs,
-          meta: {
-            total,
-            page,
-            limit,
-            totalPages: Math.ceil(total / limit),
-          },
-        },
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: {
-          code: ErrorCodes.INTERNAL_ERROR,
-          message: 'Failed to fetch jobs'
+          data,
+          meta
         }
       };
+    } catch (error) {
+      console.error('Error in getJobs:', error);
+      throw new Error(`Failed to get jobs: ${error.message}`);
     }
   }
 
