@@ -51,7 +51,7 @@ export class AuthService {
     // Save refresh token
     await this.userRepository.update(
       { id: newUser.id },
-      { refreshToken: refreshToken },
+      { accessToken: accessToken, refreshToken: refreshToken },
     );
 
     return {

@@ -79,8 +79,8 @@ export class AuthController {
     type: ApiExceptionDto
   })
   @Post('register')
-  async register(@Body() registerDto: RegisterDto) {
-    const result = await this.authService.register(registerDto);
+  async register(@Body() data: RegisterDto): Promise<any> {
+    const result = await this.authService.register(data);
     return {
       success: true,
       message: 'Registration successful',
